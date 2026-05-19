@@ -940,38 +940,16 @@ function getFile(id, source) {
   return store[source].find(f => f.id === id);
 }
 
-async function downloadFile(id, source) {
+function downloadFile(id, source) {
   const f = getFile(id, source);
   if (!f) return;
 
   // ודא סיומת .srt תמיד
-  let finalName = f.name;
-  finalName = finalName.replace(/\.(srt|txt)(\.srt|\.txt)*$/i, '') + '.srt';
+  let finalName = f.name.replace(/\.(srt|txt)(\.srt|\.txt)*$/i, '') + '.srt';
 
-  // BOM לעברית נכונה בנגנים — שמור כ-octet-stream כדי למנוע שינוי סיומת לטקסט
-  const bom = '\uFEFF';
-  const blob = new Blob([bom + f.content], { type: 'application/octet-stream' });
+  // BOM לעברית נכונה בנגנים
+  const blob = new Blob(['\uFEFF' + f.content], { type: 'application/octet-stream' });
 
-  // File System Access API (מאפשר בחירת תיקייה — Chrome desktop)
-  if (window.showSaveFilePicker) {
-    try {
-      const fileHandle = await window.showSaveFilePicker({
-        suggestedName: finalName,
-        types: [{ description: 'קובץ כתוביות SRT', accept: {'application/octet-stream': ['.srt']} }],
-      });
-      const writable = await fileHandle.createWritable();
-      await writable.write(blob);
-      await writable.close();
-      openFileId = null;
-      renderList(source);
-      showToast('✅ הקובץ נשמר בהצלחה!');
-      return;
-    } catch(e) {
-      if (e.name === 'AbortError') return; // המשתמש ביטל
-    }
-  }
-
-  // Fallback: הורדה ישירה עם סיומת .srt מוכרחת
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -982,10 +960,10 @@ async function downloadFile(id, source) {
   setTimeout(() => {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-  }, 300);
+  }, 500);
   openFileId = null;
   renderList(source);
-  showToast('✅ ' + finalName + ' נשמר');
+  showToast('✅ ' + finalName + ' נשמר בהורדות');
 }
 
 function deleteFile(id, source) {
