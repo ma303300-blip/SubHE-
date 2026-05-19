@@ -315,9 +315,18 @@ html { background: #0a0a1a; }
   border-radius: var(--radius); border: 1px solid var(--border);
   overflow: hidden; transition: all 0.2s;
 }
-.file-card.open {
-  border-color: rgba(30,111,245,0.3);
-  box-shadow: 0 4px 20px rgba(30,111,245,0.1);
+.file-row-simple {
+  display: flex; align-items: center; gap: 14px;
+  padding: 14px 16px 8px;
+}
+.file-actions-row {
+  display: flex; gap: 6px;
+  padding: 0 8px 10px;
+}
+.file-actions-row .action-btn {
+  flex: 1; padding: 12px 8px;
+  justify-content: center;
+  gap: 6px;
 }
 .file-row {
   display: flex; align-items: center; gap: 14px;
@@ -904,27 +913,25 @@ function renderList(source) {
   }
 
   container.innerHTML = list.map(f => {
-    const isOpen = openFileId === f.id + source;
     const icon = source === 'favorites' ? '⭐' : '🗒';
     const thumbClass = source === 'favorites' ? 'gold' : '';
     const favBtn = source === 'downloads'
-      ? `<button class="action-btn star" onclick="addFavorite('${f.id}')"><span class="btn-icon">⭐</span>העבר למועדפים</button>`
+      ? `<button class="action-btn star" onclick="addFavorite('${f.id}')"><span class="btn-icon">⭐</span>מועדפים</button>`
       : '';
     const displayName = f.name.replace(/_he\.srt$/i, '').replace(/_/g, ' ').replace(/\.srt$/i, '');
     const linesInfo = f.lines ? ` · ${f.lines} כתוביות` : '';
-    return `<div class="file-card ${isOpen ? 'open' : ''}">
-      <div class="file-row" onclick="toggleFile('${f.id}','${source}')">
+    return `<div class="file-card">
+      <div class="file-row-simple">
         <div class="file-thumb ${thumbClass}">${icon}</div>
         <div class="file-info">
           <div class="file-name" dir="ltr">${displayName}</div>
           <div class="file-meta">${f.date} · ${(f.size/1024).toFixed(1)} KB${linesInfo}</div>
         </div>
-        <div class="file-chevron">›</div>
       </div>
-      <div class="action-menu ${isOpen ? 'open' : ''}">
-        <button class="action-btn download" onclick="downloadFile('${f.id}','${source}')"><span class="btn-icon">⬇️</span>הורד למכשיר</button>
+      <div class="file-actions-row">
+        <button class="action-btn download" onclick="downloadFile('${f.id}','${source}')"><span class="btn-icon">⬇️</span>הורד</button>
         ${favBtn}
-        <button class="action-btn danger" onclick="deleteFile('${f.id}','${source}')"><span class="btn-icon">🗑️</span>מחק קובץ</button>
+        <button class="action-btn danger" onclick="deleteFile('${f.id}','${source}')"><span class="btn-icon">🗑️</span>מחק</button>
       </div>
     </div>`;
   }).join('');
