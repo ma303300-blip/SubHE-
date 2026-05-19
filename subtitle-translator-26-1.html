@@ -1060,12 +1060,49 @@ function getFile(id, source) {
 function downloadFile(id, source) {
   const f = getFile(id,source);
   if (!f) return;
+
+  // Ask for custom filename
+  const customName = prompt('שם הקובץ:', f.name.replace(/_he\.srt$/i,'_he.srt'));
+  if (customName === null) return; // user cancelled
+  const finalName = customName.trim() || f.name;
+
   const blob = new Blob([f.content],{type:'text/plain;charset=utf-8'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href=url; a.download=f.name; a.click();
+  a.href=url;
+  a.download=finalName.endsWith('.srt') ? finalName : finalName + '.srt';
+  a.click();
   URL.revokeObjectURL(url);
-  showToast('הקובץ הורד בהצלחה ✅');
+  openFileId = null;
+  renderList(source);
+
+  // Show toast with instructions
+  showToast('✅ הקובץ נשמר בתיקיית ההורדות');
+  
+  // Show download location modal
+  setTimeout(() => {
+    showDownloadModal(finalName.endsWith('.srt') ? finalName : finalName + '.srt');
+  }, 800);
+}
+
+function showDownloadModal(filename) {
+  const modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:9999;display:flex;align-items:center;justify-content:center;padding:24px;';
+  modal.innerHTML = `
+    <div style="background:#0e1118;border:1px solid rgba(30,111,245,0.3);border-radius:24px;padding:28px 24px;max-width:360px;width:100%;direction:rtl;text-align:center;">
+      <div style="font-size:40px;margin-bottom:12px;">📥</div>
+      <div style="font-size:18px;font-weight:900;color:#e8eaf0;margin-bottom:8px;">הקובץ נשמר!</div>
+      <div style="font-size:13px;color:#7a8ba0;margin-bottom:6px;">שם הקובץ:</div>
+      <div style="font-size:14px;font-weight:700;color:#4f9eff;margin-bottom:20px;word-break:break-all;">${filename}</div>
+      <div style="font-size:13px;color:#a0b4c8;margin-bottom:24px;line-height:1.6;">
+        הקובץ נמצא בתיקיית <strong style="color:#fff;">הורדות</strong> במכשיר שלך.<br>
+        פתח את אפליקציית <strong style="color:#fff;">קבצים / My Files</strong> ← <strong style="color:#fff;">הורדות</strong>
+      </div>
+      <button onclick="this.closest('[style]').remove()" style="width:100%;padding:14px;border-radius:12px;border:none;background:linear-gradient(135deg,#1e6ff5,#1454c4);color:#fff;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;">הבנתי ✓</button>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', e => { if(e.target===modal) modal.remove(); });
 }
 
 function deleteFile(id, source) {
