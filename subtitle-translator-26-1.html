@@ -940,45 +940,53 @@ function getFile(id, source) {
   return store[source].find(f => f.id === id);
 }
 
-async function downloadFile(id, source) {
+function downloadFile(id, source) {
   const f = getFile(id, source);
   if (!f) return;
 
   let finalName = f.name.replace(/\.(srt|txt)(\.srt|\.txt)*$/i, '') + '.srt';
   const blob = new Blob(['\uFEFF' + f.content], { type: 'application/octet-stream' });
-
-  // פתח חלון "שמור בשם" עם בחירת תיקייה
-  if (window.showSaveFilePicker) {
-    try {
-      const handle = await window.showSaveFilePicker({
-        suggestedName: finalName,
-        types: [{ description: 'קובץ כתוביות SRT', accept: { 'application/octet-stream': ['.srt'] } }]
-      });
-      const writable = await handle.createWritable();
-      await writable.write(blob);
-      await writable.close();
-      openFileId = null;
-      renderList(source);
-      showToast('✅ הקובץ נשמר בהצלחה!');
-      return;
-    } catch(e) {
-      if (e.name === 'AbortError') return;
-      // שגיאה אחרת — נפול להורדה רגילה
-    }
-  }
-
-  // fallback — iOS Safari ומכשירים ללא תמיכה
   const url = URL.createObjectURL(blob);
+
   const a = document.createElement('a');
   a.href = url;
   a.download = finalName;
   a.style.display = 'none';
   document.body.appendChild(a);
   a.click();
-  setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 500);
+
+  setTimeout(() => {
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, 1000);
+
   openFileId = null;
   renderList(source);
-  showToast('✅ ' + finalName + ' ירד לתיקיית ההורדות');
+  showDownloadSuccess(finalName);
+}
+
+function showDownloadSuccess(filename) {
+  // הסר מודל קודם אם קיים
+  const old = document.getElementById('dlModal');
+  if (old) old.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'dlModal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:99999;display:flex;align-items:center;justify-content:center;padding:24px;';
+  modal.innerHTML = `
+    <div style="background:#0e1118;border:1px solid rgba(16,185,129,0.4);border-radius:24px;padding:32px 24px;max-width:340px;width:100%;direction:rtl;text-align:center;">
+      <div style="font-size:56px;margin-bottom:16px;">✅</div>
+      <div style="font-size:20px;font-weight:900;color:#f0f2f8;margin-bottom:10px;">הקובץ הורד!</div>
+      <div style="font-size:14px;color:#4f9eff;font-weight:700;margin-bottom:16px;word-break:break-all;">${filename}</div>
+      <div style="font-size:13px;color:#8892a4;margin-bottom:28px;line-height:1.7;">
+        הקובץ נמצא בתיקיית <strong style="color:#fff;">הורדות</strong> במכשיר שלך.<br>
+        פתח <strong style="color:#fff;">מנהל קבצים</strong> ← <strong style="color:#fff;">הורדות</strong>
+      </div>
+      <button onclick="document.getElementById('dlModal').remove()" style="width:100%;padding:15px;border-radius:14px;border:none;background:linear-gradient(135deg,#1e6ff5,#1454c4);color:#fff;font-size:16px;font-weight:800;cursor:pointer;font-family:inherit;">הבנתי ✓</button>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', e => { if(e.target === modal) modal.remove(); });
 }
 
 function deleteFile(id, source) {
