@@ -952,21 +952,45 @@ function downloadFile(id, source) {
   if (!f) return;
 
   let finalName = f.name.replace(/\.(srt|txt)(\.srt|\.txt)*$/i, '') + '.srt';
-  const blob = new Blob(['\uFEFF' + f.content], { type: 'application/octet-stream' });
-  const url = URL.createObjectURL(blob);
+  const fileContent = '\uFEFF' + f.content;
 
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = finalName;
-  a.style.display = 'none';
-  document.body.appendChild(a);
-  a.click();
+  // שיטה 1: Blob + a.click (Chrome רגיל)
+  try {
+    const blob = new Blob([fileContent], { type: 'application/octet-stream' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = finalName;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 1000);
+    openFileId = null;
+    renderList(source);
+    showDownloadSuccess(finalName);
+    return;
+  } catch(e) {}
 
-  setTimeout(() => {
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  }, 1000);
+  // שיטה 2: base64 data URL (WebView / APK)
+  try {
+    const b64 = btoa(unescape(encodeURIComponent(fileContent)));
+    const dataUrl = 'data:application/octet-stream;base64,' + b64;
+    const a = document.createElement('a');
+    a.href = dataUrl;
+    a.download = finalName;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => document.body.removeChild(a), 1000);
+    openFileId = null;
+    renderList(source);
+    showDownloadSuccess(finalName);
+    return;
+  } catch(e) {}
 
+  // שיטה 3: פתח בחלון חדש (fallback אחרון)
+  const b64 = btoa(unescape(encodeURIComponent(fileContent)));
+  window.open('data:application/octet-stream;base64,' + b64, '_blank');
   openFileId = null;
   renderList(source);
   showDownloadSuccess(finalName);
