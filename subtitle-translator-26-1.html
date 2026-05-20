@@ -9,6 +9,9 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="SubHE">
 <title>SubHE</title>
+<link rel="manifest" href="manifest.json">
+<meta name="application-name" content="SubHE">
+<meta name="description" content="מתרגם כתוביות SRT לעברית">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@400;600;700;900&display=swap');
@@ -1471,8 +1474,11 @@ async function doUploadToDrive(fileId, source) {
       body: JSON.stringify({ role: 'reader', type: 'anyone' })
     });
 
-    showToast('✅ הועלה בהצלחה! נפתח ב-Drive');
-    setTimeout(() => { window.open(data.webViewLink, '_blank'); }, 1200);
+    // Show toast with clickable Drive link
+    const toast = document.getElementById('toast');
+    toast.innerHTML = `✅ הועלה! <a href="${data.webViewLink}" target="_blank" style="color:#4f9eff;text-decoration:underline;margin-right:6px;">פתח ב-Drive</a>`;
+    toast.classList.add('show');
+    setTimeout(() => { toast.classList.remove('show'); toast.innerHTML=''; }, 5000);
   } catch(e) {
     showToast('שגיאה: ' + e.message);
   }
