@@ -9,6 +9,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="SubHE">
 <title>SubHE</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@400;600;700;900&display=swap');
 
@@ -559,6 +560,41 @@ html { background: #0a0a1a; }
 .action-btn.download .btn-icon { background: rgba(30,111,245,0.15); }
 .action-btn.download { border-color: rgba(30,111,245,0.15); }
 .action-btn.download:active { background: rgba(30,111,245,0.08); }
+
+/* Google Drive button */
+.action-btn.gdrive .btn-icon { background: rgba(26,188,156,0.15); }
+.action-btn.gdrive { border-color: rgba(26,188,156,0.15); }
+.action-btn.gdrive:active { background: rgba(26,188,156,0.08); }
+
+/* Drive status bar */
+#drive-status-bar {
+  display: none;
+  align-items: center;
+  gap: 10px;
+  background: rgba(26,188,156,0.08);
+  border: 1px solid rgba(26,188,156,0.2);
+  border-radius: 12px;
+  padding: 10px 14px;
+  margin: 0 16px 12px;
+  font-size: 13px;
+  color: #8892a4;
+  direction: rtl;
+}
+#drive-status-bar.visible { display: flex; }
+#drive-status-bar .drive-avatar {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: linear-gradient(135deg,#1abc9c,#16a085);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; flex-shrink: 0;
+}
+#drive-status-bar .drive-info { flex: 1; }
+#drive-status-bar .drive-name { color: #f0f2f8; font-weight: 700; font-size: 13px; }
+#drive-status-bar .drive-logout {
+  background: none; border: none; color: #4a5568; cursor: pointer;
+  font-size: 12px; padding: 4px 8px; border-radius: 6px;
+  font-family: inherit;
+}
+#drive-status-bar .drive-logout:active { background: rgba(255,255,255,0.05); }
 .action-btn.danger { color: var(--red); border-color: rgba(239,68,68,0.15); }
 .action-btn.danger .btn-icon { background: rgba(239,68,68,0.12); }
 .action-btn.danger:active { background: rgba(239,68,68,0.06); }
@@ -778,6 +814,14 @@ html { background: #0a0a1a; }
   <div class="section-header">
     <div class="section-title">הורדות</div>
     <div class="section-count" id="dl-count">0 קבצים</div>
+  </div>
+  <div id="drive-status-bar">
+    <div class="drive-avatar">☁️</div>
+    <div class="drive-info">
+      <div class="drive-name" id="drive-user-name">מחובר ל-Google Drive</div>
+      <div id="drive-user-email" style="font-size:11px;"></div>
+    </div>
+    <button class="drive-logout" onclick="driveLogout()">התנתק</button>
   </div>
   <div id="downloads-list"></div>
 </div>
@@ -1053,6 +1097,7 @@ function renderList(source) {
       </div>
       <div class="action-menu ${isOpen?'open':''}">
         <button class="action-btn download" onclick="shareFile('${f.id}','${source}')"><span class="btn-icon">📤</span>שתף קובץ</button>
+        <button class="action-btn gdrive" onclick="uploadToDrive('${f.id}','${source}')"><span class="btn-icon">☁️</span>שמור ב-Drive</button>
         <button class="action-btn danger" onclick="deleteFile('${f.id}','${source}')"><span class="btn-icon">🗑️</span>מחק קובץ</button>
         ${favBtn}
       </div>
@@ -1325,6 +1370,140 @@ document.addEventListener('touchend', function(e) {
   const btn = e.target.closest('button, .upload-label, .file-row, .tab');
   if (btn) setTimeout(() => btn.style.opacity = '', 150);
 }, {passive: true});
+
+// ── Google Drive Integration ──────────────────────────────────────────────
+const GDRIVE_CLIENT_ID = '633051998389-a80p619lkrkcddmi8h004b0qhaagm9f5.apps.googleusercontent.com';
+const GDRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
+
+let driveAccessToken = null;
+let driveUserInfo = null;
+
+// Restore token from session
+(function() {
+  try {
+    const saved = sessionStorage.getItem('gdrive_token');
+    const info  = sessionStorage.getItem('gdrive_user');
+    if (saved) { driveAccessToken = saved; }
+    if (info)  { driveUserInfo = JSON.parse(info); updateDriveStatusBar(); }
+  } catch(e) {}
+})();
+
+function updateDriveStatusBar() {
+  const bar = document.getElementById('drive-status-bar');
+  if (!bar) return;
+  if (driveAccessToken && driveUserInfo) {
+    document.getElementById('drive-user-name').textContent = driveUserInfo.name || 'מחובר';
+    document.getElementById('drive-user-email').textContent = driveUserInfo.email || '';
+    bar.classList.add('visible');
+  } else {
+    bar.classList.remove('visible');
+  }
+}
+
+function driveLogin(onSuccess) {
+  if (!window.google || !window.google.accounts) {
+    showToast('טוען Google... נסה שוב עוד שניה');
+    return;
+  }
+  const client = google.accounts.oauth2.initTokenClient({
+    client_id: GDRIVE_CLIENT_ID,
+    scope: GDRIVE_SCOPE + ' https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email',
+    callback: async (resp) => {
+      if (resp.error) { showToast('שגיאת התחברות: ' + resp.error); return; }
+      driveAccessToken = resp.access_token;
+      try {
+        sessionStorage.setItem('gdrive_token', driveAccessToken);
+        const r = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+          headers: { Authorization: 'Bearer ' + driveAccessToken }
+        });
+        driveUserInfo = await r.json();
+        sessionStorage.setItem('gdrive_user', JSON.stringify(driveUserInfo));
+        updateDriveStatusBar();
+      } catch(e) {}
+      if (onSuccess) onSuccess();
+    }
+  });
+  client.requestAccessToken();
+}
+
+function driveLogout() {
+  if (driveAccessToken && window.google && window.google.accounts) {
+    google.accounts.oauth2.revoke(driveAccessToken, () => {});
+  }
+  driveAccessToken = null;
+  driveUserInfo = null;
+  sessionStorage.removeItem('gdrive_token');
+  sessionStorage.removeItem('gdrive_user');
+  updateDriveStatusBar();
+  showToast('התנתקת מ-Google Drive');
+}
+
+async function doUploadToDrive(fileId, source) {
+  const f = getFile(fileId, source);
+  if (!f) return;
+  showToast('מעלה ל-Google Drive...');
+  try {
+    // Get or create SubHE folder
+    let folderId = await getOrCreateDriveFolder();
+
+    // Upload file
+    const blob = new Blob([f.content], { type: 'text/plain' });
+    const meta = JSON.stringify({ name: f.name, parents: [folderId] });
+    const form = new FormData();
+    form.append('metadata', new Blob([meta], { type: 'application/json' }));
+    form.append('file', blob);
+
+    const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + driveAccessToken },
+      body: form
+    });
+    if (!res.ok) {
+      if (res.status === 401) { driveAccessToken = null; sessionStorage.removeItem('gdrive_token'); }
+      throw new Error('שגיאה ' + res.status);
+    }
+    const data = await res.json();
+
+    // Make file public (shareable link)
+    await fetch(`https://www.googleapis.com/drive/v3/files/${data.id}/permissions`, {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + driveAccessToken, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role: 'reader', type: 'anyone' })
+    });
+
+    showToast('✅ הועלה בהצלחה! נפתח ב-Drive');
+    setTimeout(() => { window.open(data.webViewLink, '_blank'); }, 1200);
+  } catch(e) {
+    showToast('שגיאה: ' + e.message);
+  }
+}
+
+async function getOrCreateDriveFolder() {
+  // Search for existing SubHE folder
+  const q = encodeURIComponent("name='SubHE' and mimeType='application/vnd.google-apps.folder' and trashed=false");
+  const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id)`, {
+    headers: { Authorization: 'Bearer ' + driveAccessToken }
+  });
+  const data = await res.json();
+  if (data.files && data.files.length > 0) return data.files[0].id;
+
+  // Create folder
+  const create = await fetch('https://www.googleapis.com/drive/v3/files', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + driveAccessToken, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: 'SubHE', mimeType: 'application/vnd.google-apps.folder' })
+  });
+  const folder = await create.json();
+  return folder.id;
+}
+
+function uploadToDrive(fileId, source) {
+  if (driveAccessToken) {
+    doUploadToDrive(fileId, source);
+  } else {
+    driveLogin(() => doUploadToDrive(fileId, source));
+  }
+}
 
 // ── Init ──
 updateTabLabels();
