@@ -1076,27 +1076,19 @@ async function shareFile(id, source) {
 
   const blob = new Blob([f.content], {type: 'text/plain;charset=utf-8'});
 
-  // נסיון ראשון — Web Share API עם קובץ (HTTPS בלבד)
-  if (location.protocol === 'https:' && navigator.share) {
-    let fileObj = new File([blob], f.name, {type: 'text/plain'});
-    let canShare = false;
-    try { canShare = navigator.canShare({files: [fileObj]}); } catch(e) {}
-    if (!canShare) {
-      fileObj = new File([blob], f.name, {type: 'application/octet-stream'});
-      try { canShare = navigator.canShare({files: [fileObj]}); } catch(e) {}
-    }
-    if (canShare) {
-      try {
-        await navigator.share({files: [fileObj], title: f.name});
-        showToast('הקובץ שותף בהצלחה ✅');
-        return;
-      } catch(e) {
-        if (e.name === 'AbortError') return;
-      }
+  // Web Share API עם קובץ — פותח תפריט אנדרואיד/iOS האמיתי
+  if (navigator.share) {
+    const fileObj = new File([blob], f.name, {type: 'text/plain'});
+    try {
+      await navigator.share({ files: [fileObj], title: f.name });
+      showToast('הקובץ שותף בהצלחה ✅');
+      return;
+    } catch(e) {
+      if (e.name === 'AbortError') return; // המשתמש סגר — לא שגיאה
     }
   }
 
-  // אנדרואיד / file:// — הורד + הצג מודל שיתוף מותאם
+  // Fallback: הורדה ישירה
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -1105,58 +1097,7 @@ async function shareFile(id, source) {
   a.click();
   document.body.removeChild(a);
   setTimeout(() => URL.revokeObjectURL(url), 1000);
-
-  // הצג מודל שיתוף עם כפתורים לאפליקציות
-  showShareModal(f);
-}
-
-function showShareModal(f) {
-  // הסר מודל קודם אם קיים
-  const old = document.getElementById('shareModal');
-  if (old) old.remove();
-
-  const apps = [
-    {name:'WhatsApp', icon:'https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg',
-      url:`whatsapp://send?text=${encodeURIComponent('קובץ כתוביות: '+f.name+'\n\nהקובץ הורד לתיקיית ההורדות שלך ✅')}`},
-    {name:'Gmail', icon:'https://upload.wikimedia.org/wikipedia/commons/7/7e/Gmail_icon_%282020%29.svg',
-      url:`mailto:?subject=${encodeURIComponent(f.name)}&body=${encodeURIComponent('קובץ הכתוביות המתורגם הורד לתיקיית ההורדות שלך.')}`},
-    {name:'Telegram', icon:'https://upload.wikimedia.org/wikipedia/commons/8/82/Telegram_logo.svg',
-      url:`tg://msg?text=${encodeURIComponent('קובץ כתוביות: '+f.name)}`},
-  ];
-
-  const modal = document.createElement('div');
-  modal.id = 'shareModal';
-  modal.style.cssText = `
-    position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9999;
-    display:flex;align-items:flex-end;justify-content:center;
-    padding-bottom:env(safe-area-inset-bottom,0px);
-  `;
-  modal.innerHTML = `
-    <div style="background:#0e1118;border-radius:24px 24px 0 0;border:1px solid rgba(255,255,255,0.1);
-                padding:24px 20px 32px;width:100%;max-width:480px;direction:rtl;">
-      <div style="width:40px;height:4px;background:rgba(255,255,255,0.2);border-radius:2px;margin:0 auto 20px;"></div>
-      <div style="font-size:16px;font-weight:800;color:#f0f2f8;margin-bottom:6px;">שתף קובץ</div>
-      <div style="font-size:12px;color:#4a5568;margin-bottom:20px;">הקובץ הורד להורדות — בחר אפליקציה לשיתוף</div>
-      <div style="display:flex;gap:16px;justify-content:center;margin-bottom:24px;">
-        ${apps.map(app=>`
-          <a href="${app.url}" style="display:flex;flex-direction:column;align-items:center;gap:8px;text-decoration:none;cursor:pointer;">
-            <div style="width:60px;height:60px;border-radius:16px;background:rgba(255,255,255,0.07);
-                        border:1px solid rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center;padding:12px;">
-              <img src="${app.icon}" style="width:100%;height:100%;object-fit:contain;" />
-            </div>
-            <span style="font-size:11px;color:#8892a4;font-weight:700;">${app.name}</span>
-          </a>
-        `).join('')}
-      </div>
-      <button onclick="document.getElementById('shareModal').remove()"
-        style="width:100%;padding:14px;border-radius:14px;border:1px solid rgba(255,255,255,0.1);
-               background:#141720;color:#8892a4;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;">
-        סגור
-      </button>
-    </div>
-  `;
-  modal.addEventListener('click', e => { if(e.target===modal) modal.remove(); });
-  document.body.appendChild(modal);
+  showToast('הקובץ הורד למכשיר 📥');
 }
 
 function deleteFile(id, source) {
