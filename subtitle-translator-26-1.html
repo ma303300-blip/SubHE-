@@ -1075,20 +1075,23 @@ async function shareFile(id, source) {
   if (!f) return;
 
   const blob = new Blob([f.content], {type: 'text/plain;charset=utf-8'});
+  const fileObj = new File([blob], f.name, {type: 'text/plain'});
 
-  // Web Share API עם קובץ — פותח תפריט אנדרואיד/iOS האמיתי
+  // DEBUG — נמחק אחרי הבדיקה
+  const hasShare = !!navigator.share;
+  const canShare = hasShare ? (() => { try { return navigator.canShare({files:[fileObj]}); } catch(e) { return 'error:'+e.message; } })() : 'N/A';
+  alert(`navigator.share: ${hasShare}\ncanShare(files): ${canShare}\nprotocol: ${location.protocol}`);
+
   if (navigator.share) {
-    const fileObj = new File([blob], f.name, {type: 'text/plain'});
     try {
       await navigator.share({ files: [fileObj], title: f.name });
       showToast('הקובץ שותף בהצלחה ✅');
       return;
     } catch(e) {
-      if (e.name === 'AbortError') return; // המשתמש סגר — לא שגיאה
+      if (e.name === 'AbortError') return;
     }
   }
 
-  // Fallback: הורדה ישירה
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
