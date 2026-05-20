@@ -1070,37 +1070,45 @@ function getFile(id, source) {
   return store[source].find(f=>f.id===id);
 }
 
-async function shareFile(id, source) {
+function shareFile(id, source) {
   const f = getFile(id, source);
   if (!f) return;
 
-  const blob = new Blob([f.content], {type: 'text/plain;charset=utf-8'});
-  const fileObj = new File([blob], f.name, {type: 'text/plain'});
+  const siteUrl = 'https://ma303300-blip.github.io/SubHE-/';
+  const msg = encodeURIComponent('הנה קובץ כתוביות מתורגם לעברית 🎬\nלחץ על הקישור להורדה:\n' + siteUrl);
 
-  // DEBUG — נמחק אחרי הבדיקה
-  const hasShare = !!navigator.share;
-  const canShare = hasShare ? (() => { try { return navigator.canShare({files:[fileObj]}); } catch(e) { return 'error:'+e.message; } })() : 'N/A';
-  alert(`navigator.share: ${hasShare}\ncanShare(files): ${canShare}\nprotocol: ${location.protocol}`);
+  const old = document.getElementById('shareModal');
+  if (old) old.remove();
 
-  if (navigator.share) {
-    try {
-      await navigator.share({ files: [fileObj], title: f.name });
-      showToast('הקובץ שותף בהצלחה ✅');
-      return;
-    } catch(e) {
-      if (e.name === 'AbortError') return;
-    }
-  }
+  const apps = [
+    { name: 'WhatsApp', emoji: '💬', color: '#25D366', url: 'https://wa.me/?text=' + msg },
+    { name: 'Telegram', emoji: '✈️', color: '#2AABEE', url: 'https://t.me/share/url?url=' + encodeURIComponent(siteUrl) + '&text=' + encodeURIComponent('קובץ כתוביות מתורגם לעברית 🎬') },
+    { name: 'Gmail',    emoji: '📧', color: '#EA4335', url: 'mailto:?subject=' + encodeURIComponent('קובץ כתוביות: ' + f.name) + '&body=' + msg },
+  ];
 
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = f.name;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-  showToast('הקובץ הורד למכשיר 📥');
+  const modal = document.createElement('div');
+  modal.id = 'shareModal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9999;display:flex;align-items:flex-end;justify-content:center;';
+  modal.innerHTML = `
+    <div style="background:#0e1118;border-radius:24px 24px 0 0;border:1px solid rgba(255,255,255,0.1);padding:24px 20px calc(32px + env(safe-area-inset-bottom,0px));width:100%;max-width:480px;direction:rtl;">
+      <div style="width:40px;height:4px;background:rgba(255,255,255,0.2);border-radius:2px;margin:0 auto 20px;"></div>
+      <div style="font-size:17px;font-weight:900;color:#f0f2f8;margin-bottom:6px;">שתף קובץ</div>
+      <div style="font-size:13px;color:#8892a4;margin-bottom:20px;line-height:1.6;">בחר אפליקציה לשליחת קישור להורדה</div>
+      <div style="display:flex;gap:12px;justify-content:center;margin-bottom:24px;">
+        ${apps.map(app => `
+          <a href="${app.url}" onclick="document.getElementById('shareModal').remove()" style="display:flex;flex-direction:column;align-items:center;gap:8px;text-decoration:none;flex:1;">
+            <div style="width:64px;height:64px;border-radius:18px;background:${app.color}22;border:1px solid ${app.color}44;display:flex;align-items:center;justify-content:center;font-size:28px;">
+              ${app.emoji}
+            </div>
+            <span style="font-size:11px;color:#8892a4;font-weight:700;">${app.name}</span>
+          </a>
+        `).join('')}
+      </div>
+      <button onclick="document.getElementById('shareModal').remove()" style="width:100%;padding:14px;border-radius:14px;border:1px solid rgba(255,255,255,0.1);background:#141720;color:#8892a4;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;">סגור</button>
+    </div>
+  `;
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+  document.body.appendChild(modal);
 }
 
 function deleteFile(id, source) {
