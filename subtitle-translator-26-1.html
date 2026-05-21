@@ -1006,9 +1006,19 @@ async function translateSingle(text) {
   return clean; // translateBatch handles everything via Claude
 }
 
+function isSoundEffect(text) {
+  const clean = text.replace(/<[^>]+>/g, '').trim();
+  // טקסט בסוגריים מרובעים או עגולים = תיאור סאונד, לא דיבור
+  if (/^\[.*\]$/.test(clean)) return true;
+  if (/^\(.*\)$/.test(clean)) return true;
+  // תיאורי מוזיקה
+  if (/^[♪♫].*[♪♫]?$/.test(clean)) return true;
+  return false;
+}
+
 async function translateBatch(texts) {
-  // סינון טקסטים ריקים
-  const nonEmpty = texts.map((t, i) => ({ t, i })).filter(x => x.t && x.t.trim());
+  // סינון טקסטים ריקים ואפקטי סאונד
+  const nonEmpty = texts.map((t, i) => ({ t, i })).filter(x => x.t && x.t.trim() && !isSoundEffect(x.t));
   if (!nonEmpty.length) return texts;
 
   // שלח ב-chunks של 50 משפטים
