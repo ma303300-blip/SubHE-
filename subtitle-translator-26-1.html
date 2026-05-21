@@ -739,18 +739,38 @@ html { background: #0a0a1a; }
 <div class="help-overlay" id="helpOverlay" onclick="if(event.target===this)this.classList.remove('open')">
   <div class="help-modal">
     <div class="help-title">🎬 איך משתמשים ב-SubHE</div>
+
     <div class="help-step">
       <div class="help-num">1</div>
-      <div class="help-text"><strong>העלה קובץ</strong> — לאחר שהורדת קובץ SRT באנגלית למכשיר שלך מאחד מאתרי הכתוביות, לחץ על "העלאה" ובחר את הקובץ שהורדת. לאחר מכן לחץ "אישור" להמשך.</div>
+      <div class="help-text"><strong>קבל מפתח API</strong> — האפליקציה משתמשת ב-Anthropic Claude לתרגום. לחץ על ⚙️ בראש המסך, הירשם ב-Anthropic והכנס את המפתח. $5 מספיק לאלפי תרגומים.</div>
     </div>
+
+    <div style="background:rgba(30,111,245,0.1);border:1px solid rgba(30,111,245,0.2);border-radius:12px;padding:12px 14px;margin:4px 0 8px;">
+      <div style="font-size:12px;font-weight:800;color:#4f9eff;margin-bottom:6px">🔑 איך מקבלים מפתח Anthropic (מומלץ)</div>
+      <div style="font-size:12px;color:#8892a4;line-height:1.6">
+        1. כנס ל: <strong style="color:#f0f2f8">console.anthropic.com</strong><br>
+        2. הירשם ← הוסף $5 ← לחץ "API Keys"<br>
+        3. לחץ "Create Key" ← העתק ← הדבק כאן
+      </div>
+    </div>
+
+
+
     <div class="help-step">
       <div class="help-num">2</div>
-      <div class="help-text"><strong>תרגום אוטומטי</strong> — לחץ "אישור" והאפליקציה תתרגם את כל הכתוביות מאנגלית לעברית תוך שניות.</div>
+      <div class="help-text"><strong>העלה קובץ SRT</strong> — הורד קובץ כתוביות באנגלית מאתרי כתוביות כמו Subscene או OpenSubtitles, לחץ "העלאה" ובחר את הקובץ.</div>
     </div>
     <div class="help-step">
       <div class="help-num">3</div>
-      <div class="help-text"><strong>הורד ושמור</strong> — עבור להורדות, לחץ על הקובץ והורד אותו למכשיר. ניתן גם לשמור במועדפים לגישה מהירה.</div>
+      <div class="help-text"><strong>תרגם והורד</strong> — לחץ "תרגם עכשיו" וחכה כמה שניות. הקובץ המתורגם יופיע בלשונית הורדות.</div>
     </div>
+
+    <div style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);border-radius:12px;padding:10px 14px;margin:8px 0 12px;">
+      <div style="font-size:12px;color:#f59e0b;line-height:1.6;text-align:center">
+        🔒 המפתח שלך נשמר רק במכשיר שלך<br>לא מועלה לשרת ולא נחשף לאף אחד
+      </div>
+    </div>
+
     <button class="help-close" onclick="document.getElementById('helpOverlay').classList.remove('open')">הבנתי ✓</button>
   </div>
 </div>
@@ -770,11 +790,16 @@ html { background: #0a0a1a; }
 <!-- API Key Modal -->
 <div id="apikey-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:9999;display:none;align-items:center;justify-content:center;padding:20px">
   <div style="background:#111420;border:1px solid rgba(255,255,255,0.1);border-radius:24px;padding:32px 24px;width:100%;max-width:400px">
-    <div style="font-size:28px;text-align:center;margin-bottom:12px">🔑</div>
-    <div style="font-size:18px;font-weight:800;text-align:center;margin-bottom:8px;color:#f0f2f8">מפתח Anthropic API</div>
-    <div style="font-size:13px;color:#8892a4;text-align:center;margin-bottom:20px">נשמר במכשיר שלך בלבד<br>לא מועלה לאינטרנט</div>
-    <input type="password" id="apikey-field" placeholder="sk-ant-api03-..." style="width:100%;padding:14px;border-radius:12px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.07);color:#fff;font-size:13px;font-family:monospace;outline:none;margin-bottom:16px;direction:ltr" />
-    <button onclick="saveKey()" style="width:100%;padding:16px;border-radius:14px;border:none;background:linear-gradient(135deg,#1e6ff5,#1454c4);color:#fff;font-size:16px;font-weight:800;cursor:pointer;font-family:inherit">שמור</button>
+    <div style="font-size:28px;text-align:center;margin-bottom:8px">🔑</div>
+    <div style="font-size:18px;font-weight:800;text-align:center;margin-bottom:4px;color:#f0f2f8">מפתח AI API</div>
+    <div style="font-size:12px;color:#8892a4;text-align:center;margin-bottom:14px">🔒 נשמר במכשיר שלך בלבד</div>
+
+    <div style="margin-bottom:14px">
+      <a href="https://console.anthropic.com" target="_blank" style="display:block;padding:12px;background:rgba(30,111,245,0.1);border:1px solid rgba(30,111,245,0.25);border-radius:12px;text-align:center;text-decoration:none;color:#4f9eff;font-size:13px;font-weight:700;font-family:inherit">🤖 קבל מפתח מ-Anthropic<br><span style="font-size:11px;color:#8892a4">$5 = אלפי תרגומים · לחץ כאן להרשמה</span></a>
+    </div>
+
+    <input type="password" id="apikey-field" placeholder="הדבק כאן את המפתח..." style="width:100%;padding:14px;border-radius:12px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.07);color:#fff;font-size:12px;font-family:monospace;outline:none;margin-bottom:12px;direction:ltr" />
+    <button onclick="saveKey()" style="width:100%;padding:16px;border-radius:14px;border:none;background:linear-gradient(135deg,#1e6ff5,#1454c4);color:#fff;font-size:16px;font-weight:800;cursor:pointer;font-family:inherit">✔ שמור</button>
     <button onclick="closeKey()" style="width:100%;padding:12px;border-radius:14px;border:1px solid rgba(255,255,255,0.1);background:none;color:#8892a4;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:8px">ביטול</button>
   </div>
 </div>
@@ -1003,26 +1028,24 @@ async function translateBatch(texts) {
 
 ${numbered}`;
 
-    const CLAUDE_KEY = localStorage.getItem('subhe_apikey') || '';
-    if (!CLAUDE_KEY) throw new Error('לא הוגדר מפתח API. לחץ על ⚙️ להגדרה.');
+    const API_KEY = localStorage.getItem('subhe_apikey') || '';
+    const PROVIDER = localStorage.getItem('subhe_provider') || 'claude';
+    if (!API_KEY) throw new Error('לא הוגדר מפתח API. לחץ על ⚙️ להגדרה.');
     try {
+      let raw = '';
       const res = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-api-key': CLAUDE_KEY,
+          'x-api-key': API_KEY,
           'anthropic-version': '2023-06-01',
           'anthropic-dangerous-direct-browser-access': 'true'
         },
-        body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
-          max_tokens: 2000,
-          messages: [{ role: 'user', content: prompt }]
-        })
+        body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 2000, messages: [{ role: 'user', content: prompt }] })
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error.message);
-      const raw = data.content?.[0]?.text || '';
+      raw = data.content?.[0]?.text || '';
       const lines = raw.split('\n').filter(l => /^\d+\./.test(l.trim()));
       lines.forEach(line => {
         const m = line.match(/^(\d+)\.\s*(.+)$/);
@@ -1575,6 +1598,7 @@ function saveKey() {
     return;
   }
   localStorage.setItem('subhe_apikey', key);
+  localStorage.setItem('subhe_provider', 'claude');
   closeKey();
   alert('✅ מפתח נשמר בהצלחה!');
 }
