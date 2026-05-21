@@ -1008,11 +1008,14 @@ async function translateSingle(text) {
 
 function isSoundEffect(text) {
   const clean = text.replace(/<[^>]+>/g, '').trim();
-  // טקסט בסוגריים מרובעים או עגולים = תיאור סאונד, לא דיבור
+  // תיאור סאונד בסוגריים מרובעים בלבד = דלג
+  // אם יש מילים אמיתיות בתוך הסוגריים — עדיין דלג (זה תיאור, לא דיבור)
   if (/^\[.*\]$/.test(clean)) return true;
+  // תיאור בסוגריים עגולים = דלג
   if (/^\(.*\)$/.test(clean)) return true;
-  // תיאורי מוזיקה
-  if (/^[♪♫].*[♪♫]?$/.test(clean)) return true;
+  // ♪ לבד בלי שום מילה = דלג
+  if (/^[♪♫\s]+$/.test(clean)) return true;
+  // כל דבר אחר (דיבור, שיר עם מילים, חיה מדברת) = תרגם
   return false;
 }
 
