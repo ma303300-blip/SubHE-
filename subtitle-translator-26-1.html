@@ -838,6 +838,7 @@ html { background: #0a0a1a; }
         <div class="progress-fill" id="progress-fill"></div>
       </div>
       <div class="progress-pct" id="progress-pct">0%</div>
+      <button onclick="cancelTranslation()" style="margin-top:20px;padding:12px 28px;border-radius:14px;border:1px solid rgba(239,68,68,0.4);background:rgba(239,68,68,0.1);color:#ef4444;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">✕ בטל תרגום</button>
     </div>
   </div>
 
@@ -1011,7 +1012,7 @@ async function translateBatch(texts) {
   if (!nonEmpty.length) return texts;
 
   // שלח ב-chunks של 50 משפטים
-  const CHUNK = 50;
+  const CHUNK = 100;
   const results = [...texts];
 
   for (let c = 0; c < nonEmpty.length; c += CHUNK) {
@@ -1066,26 +1067,36 @@ ${numbered}`;
 
 // ── Translation ───────────────────────────────────────────────────────────
 async function startTranslation() {
+  translationCancelled = false;
   showStep('progress');
   const blocks = parseSRT(pendingContent);
-  const BATCH = 80;
-  const translated = [];
+  const BATCH = 150; // כל קריאה = 150 כתוביות
+  const PARALLEL = 3; // 3 קריאות במקביל
+  const translated = new Array(blocks.length);
 
   try {
+    const batches = [];
     for (let i=0; i<blocks.length; i+=BATCH) {
-      const chunk = blocks.slice(i,i+BATCH);
-      const pctBefore = Math.round((i/blocks.length)*100);
+      batches.push({ start: i, chunk: blocks.slice(i, i+BATCH) });
+    }
+
+    let done = 0;
+    for (let i=0; i<batches.length; i+=PARALLEL) {
+      const group = batches.slice(i, i+PARALLEL);
       document.getElementById('progress-text').textContent =
-        `מתרגם ${i+1}–${Math.min(i+BATCH,blocks.length)} מתוך ${blocks.length}...`;
-      document.getElementById('progress-fill').style.width = pctBefore+'%';
-      document.getElementById('progress-pct').textContent = pctBefore+'%';
+        `מתרגם ${Math.min(i*BATCH+1, blocks.length)}–${Math.min((i+PARALLEL)*BATCH, blocks.length)} מתוך ${blocks.length}...`;
 
-      const results = await translateBatch(chunk.map(b=>b.text));
-      results.forEach((t,j) => translated.push({...chunk[j], text:fixHebrew(t)}));
-
-      const pctAfter = Math.round(Math.min(i+BATCH, blocks.length)/blocks.length*100);
-      document.getElementById('progress-fill').style.width = pctAfter+'%';
-      document.getElementById('progress-pct').textContent = pctAfter+'%';
+      if (translationCancelled) break;
+      await Promise.all(group.map(async ({ start, chunk }) => {
+        if (translationCancelled) return;
+        const results = await translateBatch(chunk.map(b=>b.text));
+        if (translationCancelled) return;
+        results.forEach((t,j) => { translated[start+j] = {...chunk[j], text:fixHebrew(t)}; });
+        done += chunk.length;
+        const pct = Math.round((done/blocks.length)*100);
+        document.getElementById('progress-fill').style.width = pct+'%';
+        document.getElementById('progress-pct').textContent = pct+'%';
+      }));
     }
 
     document.getElementById('progress-text').textContent = 'מסיים...';
@@ -1579,6 +1590,18 @@ function uploadToDrive(fileId, source) {
   } else {
     driveLogin(() => doUploadToDrive(fileId, source));
   }
+}
+
+// ── Cancel Translation ──
+let translationCancelled = false;
+
+function cancelTranslation() {
+  translationCancelled = true;
+  document.getElementById('success-circle').textContent = '🛑';
+  document.getElementById('success-title').textContent = 'התרגום בוטל';
+  document.getElementById('success-text').textContent = 'לחץ "העלאה" כדי להתחיל מחדש.';
+  showStep('success');
+  setTimeout(() => { showStep('pick'); }, 2500);
 }
 
 // ── API Key ──
