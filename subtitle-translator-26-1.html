@@ -991,17 +991,23 @@ async function translateBatch(texts) {
 ${numbered}`;
 
     try {
-      const GEMINI_KEY = 'AIzaSyCu-8gSMR4HIEEFsWNfMwRK6foejudcc60';
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`, {
+      const CLAUDE_KEY = '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';
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': CLAUDE_KEY,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true'
+        },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { maxOutputTokens: 2000 }
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 2000,
+          messages: [{ role: 'user', content: prompt }]
         })
       });
       const data = await res.json();
-      const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      const raw = data.content?.[0]?.text || '';
       const lines = raw.split('\n').filter(l => /^\d+\./.test(l.trim()));
       lines.forEach(line => {
         const m = line.match(/^(\d+)\.\s*(.+)$/);
