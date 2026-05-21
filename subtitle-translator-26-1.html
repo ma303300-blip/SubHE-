@@ -3,17 +3,40 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+
+<!-- ── Android PWA ── -->
 <meta name="theme-color" content="#080a10">
 <meta name="mobile-web-app-capable" content="yes">
+<meta name="application-name" content="SubHE">
+
+<!-- ── iOS PWA ── -->
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="SubHE">
+
+<!-- ── iOS App Icon ── -->
+<link rel="apple-touch-icon" sizes="180x180" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==">
+
 <title>SubHE</title>
 <link rel="manifest" href="manifest.json">
-<meta name="application-name" content="SubHE">
 <meta name="description" content="מתרגם כתוביות SRT לעברית">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
+/* ── PWA Splash Screen — מסך פתיחה כהה בזמן טעינה ── */
+@media all and (display-mode: standalone) {
+  html { background: #080a10 !important; }
+}
+
+/* ── iOS גלילה חלקה ── */
+html {
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+}
+
+/* ── מניעת בחירת טקסט בלחיצה ── */
+* { -webkit-user-select: none; user-select: none; }
+input, textarea { -webkit-user-select: text; user-select: text; }
+
 @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@400;600;700;900&display=swap');
 
 :root {
@@ -991,11 +1014,33 @@ function buildSRT(blocks) {
 function fixHebrew(text) {
   return text.split('\n').map(line => {
     line = line.trim();
+
     // הסר תווים זרים (לא עברית, לא מספרים, לא פיסוק בסיסי)
     line = line.replace(/[^\u0590-\u05FF\u200f\u200e0-9\s.,!?;:()\'\"-–—…♪♫\[\]]/g, '');
-    // תיקון פיסוק עברי — נקודה/פסיק בסוף ולא בהתחלה
-    line = line.replace(/^([.،,!?;:]+)\s*/, '');
+
+    // הסר פיסוק שנמצא בטעות בתחילת השורה
+    line = line.replace(/^[\s.،,!?;:]+/, '');
+
+    // הסר רווחים לפני פיסוק בסוף
     line = line.replace(/\s+([.,!?;:،])$/, '$1');
+
+    // ── תיקון כיוון פיסוק בעברית ──────────────────────────────────────────
+    // בעברית (RTL), סימן שאלה/קריאה צריך להיות בצד שמאל (=סוף הקריאה).
+    // נגני כתוביות רבים מציגים אותם הפוך — הפתרון: להוסיף RLM (U+200F)
+    // לפני כל סימן פיסוק סוגר, כך שה-Unicode Bidi algorithm יציב אותו נכון.
+    const RTL_MARK = '\u200F';
+
+    // הסר RLM קיים כדי לא לכפול
+    line = line.replace(/\u200F/g, '');
+
+    // הוסף RLM לפני סימני פיסוק בסוף משפט: ? ! . , ; : — …
+    // זה גורם לנגן להציג אותם בצד שמאל (סוף המשפט ב-RTL)
+    line = line.replace(/([?!.,;:—…]+)$/, RTL_MARK + '$1');
+
+    // אם המשפט מתחיל ב-♪ — שמור כמו שהוא (כיוון לא רלוונטי)
+    // אם יש סוגריים — הוסף RLM לפני הסגירה
+    line = line.replace(/(\))$/, RTL_MARK + '$1');
+
     return line.trim();
   }).join('\n');
 }
@@ -1038,8 +1083,8 @@ async function translateBatch(texts) {
 חוקים קפדניים:
 - החזר אך ורק את התרגומים ממוספרים, כל אחד בשורה נפרדת
 - השתמש אך ורק באותיות עבריות, מספרים וסימני פיסוק — ללא תווים מכל שפה אחרת
-- פסיקים ונקודות יופיעו בסוף המשפט (לא בהתחלה)
-- כיוון טקסט: מימין לשמאל
+- כיוון טקסט: מימין לשמאל — סימני שאלה (?) וקריאה (!) ונקודה (.) יופיעו בסוף המשפט (צד שמאל)
+- פסיקים ונקודות יופיעו בסוף המשפט בלבד, לא בתחילתו
 - אל תוסיף הסברים, רק את התרגומים
 - שמור על אותו מספור
 
@@ -1089,6 +1134,8 @@ ${numbered}`;
 async function startTranslation() {
   translationCancelled = false;
   showStep('progress');
+  markTranslationStart(pendingFile ? pendingFile.name : 'unknown');
+  await requestWakeLock();
   const blocks = parseSRT(pendingContent);
   const BATCH = 150; // כל קריאה = 150 כתוביות
   const PARALLEL = 3; // 3 קריאות במקביל
@@ -1141,10 +1188,12 @@ async function startTranslation() {
     document.getElementById('success-title').textContent='התרגום הושלם!';
     document.getElementById('success-text').textContent=`הקובץ "${heName}" נשמר בהורדות.`;
     showStep('success');
+    markTranslationEnd();
 
     setTimeout(()=>{ showStep('pick'); switchTab('downloads'); }, 2800);
 
   } catch(err) {
+    markTranslationEnd();
     document.getElementById('success-circle').textContent='❌';
     document.getElementById('success-title').textContent='שגיאה בתרגום';
     document.getElementById('success-text').textContent=err.message;
@@ -1617,12 +1666,64 @@ let translationCancelled = false;
 
 function cancelTranslation() {
   translationCancelled = true;
+  releaseWakeLock();
   document.getElementById('success-circle').textContent = '🛑';
   document.getElementById('success-title').textContent = 'התרגום בוטל';
   document.getElementById('success-text').textContent = 'לחץ "העלאה" כדי להתחיל מחדש.';
   showStep('success');
   setTimeout(() => { showStep('pick'); }, 2500);
 }
+
+// ── Wake Lock — מונע כיבוי מסך בזמן תרגום ──────────────────────────────
+let wakeLock = null;
+
+async function requestWakeLock() {
+  try {
+    if ('wakeLock' in navigator) {
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', () => { wakeLock = null; });
+    }
+  } catch (e) { /* לא נתמך — לא נורא */ }
+}
+
+function releaseWakeLock() {
+  if (wakeLock) { try { wakeLock.release(); } catch(e){} wakeLock = null; }
+}
+
+// כשחוזרים לטאב — נסה לקחת שוב Wake Lock אם תרגום רץ
+document.addEventListener('visibilitychange', async () => {
+  if (document.visibilityState === 'visible' && translationActive) {
+    await requestWakeLock();
+  }
+});
+
+// ── Queue — שומר תור תרגום ב-localStorage ────────────────────────────────
+// אם הדפדפן הרג את הדף באמצע, בפעם הבאה שנפתח — נזהה ונודיע למשתמש
+let translationActive = false;
+
+function markTranslationStart(fileName) {
+  translationActive = true;
+  try { localStorage.setItem('subhe_inprogress', JSON.stringify({ file: fileName, ts: Date.now() })); } catch(e) {}
+}
+function markTranslationEnd() {
+  translationActive = false;
+  try { localStorage.removeItem('subhe_inprogress'); } catch(e) {}
+  releaseWakeLock();
+}
+
+// בדיקה בטעינה — האם תרגום נקטע?
+(function checkInterrupted() {
+  try {
+    const p = localStorage.getItem('subhe_inprogress');
+    if (!p) return;
+    const { file, ts } = JSON.parse(p);
+    // אם עבר יותר מ-5 דק' — כנראה נקטע
+    if (Date.now() - ts > 5 * 60 * 1000) {
+      localStorage.removeItem('subhe_inprogress');
+      setTimeout(() => showToast('⚠️ תרגום קודם נקטע. נסה שוב.'), 1000);
+    }
+  } catch(e) {}
+})();
 
 // ── API Key ──
 function openKey() {
@@ -1650,7 +1751,84 @@ function saveKey() {
 updateTabLabels();
 if (!localStorage.getItem('subhe_apikey')) { setTimeout(openKey, 500); }
 
+// ── PWA Install Banner (אנדרואיד) ────────────────────────────────────────
+let deferredInstallPrompt = null;
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  // הצג banner אחרי 3 שניות אם לא מותקן
+  setTimeout(showInstallBanner, 3000);
+});
+
+function showInstallBanner() {
+  if (!deferredInstallPrompt) return;
+  if (localStorage.getItem('subhe_install_dismissed')) return;
+  const banner = document.getElementById('install-banner');
+  if (banner) banner.style.display = 'flex';
+}
+
+function installApp() {
+  if (!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  deferredInstallPrompt.userChoice.then(() => {
+    deferredInstallPrompt = null;
+    dismissInstallBanner();
+  });
+}
+
+function dismissInstallBanner() {
+  const banner = document.getElementById('install-banner');
+  if (banner) banner.style.display = 'none';
+  localStorage.setItem('subhe_install_dismissed', '1');
+}
+
+window.addEventListener('appinstalled', () => {
+  deferredInstallPrompt = null;
+  dismissInstallBanner();
+  showToast('✅ SubHE הותקנה בהצלחה!');
+});
+
+// ── Service Worker Registration (למהירות טעינה חוזרת) ───────────────────
+if ('serviceWorker' in navigator) {
+  const swCode = `
+const CACHE = 'subhe-v1';
+const ASSETS = [location.href];
+self.addEventListener('install', e => {
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).catch(()=>{}));
+  self.skipWaiting();
+});
+self.addEventListener('activate', e => {
+  e.waitUntil(caches.keys().then(keys => Promise.all(
+    keys.filter(k => k !== CACHE).map(k => caches.delete(k))
+  )));
+  self.clients.claim();
+});
+self.addEventListener('fetch', e => {
+  if (e.request.url.includes('api.anthropic.com') ||
+      e.request.url.includes('googleapis.com') ||
+      e.request.url.includes('fonts.googleapis.com')) return;
+  e.respondWith(
+    caches.match(e.request).then(r => r || fetch(e.request).catch(() => r))
+  );
+});`;
+  const blob = new Blob([swCode], { type: 'application/javascript' });
+  const swUrl = URL.createObjectURL(blob);
+  navigator.serviceWorker.register(swUrl, { scope: './' }).catch(() => {});
+}
 
 </script>
+
+<!-- ── Install Banner (אנדרואיד Chrome) ── -->
+<div id="install-banner" style="display:none;position:fixed;bottom:96px;left:12px;right:12px;z-index:8888;background:linear-gradient(135deg,#1e6ff5,#0a3fa0);border-radius:18px;padding:14px 16px;align-items:center;gap:12px;box-shadow:0 8px 32px rgba(30,111,245,0.5)">
+  <div style="font-size:28px">📲</div>
+  <div style="flex:1">
+    <div style="font-size:14px;font-weight:800;color:#fff">התקן את SubHE</div>
+    <div style="font-size:12px;color:rgba(255,255,255,0.75)">פתח מהירה יותר ללא דפדפן</div>
+  </div>
+  <button onclick="installApp()" style="background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.4);color:#fff;font-size:13px;font-weight:800;padding:8px 16px;border-radius:10px;cursor:pointer;font-family:inherit;flex-shrink:0">התקן</button>
+  <button onclick="dismissInstallBanner()" style="background:none;border:none;color:rgba(255,255,255,0.6);font-size:18px;cursor:pointer;padding:4px;flex-shrink:0">✕</button>
+</div>
+
 </body>
 </html>
