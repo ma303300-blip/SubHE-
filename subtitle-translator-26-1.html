@@ -762,8 +762,21 @@ html { background: #0a0a1a; }
   <div class="header-logo">
     <div class="logo-icon">🎬</div>
     <div class="logo-text">SubHE</div>
+    <button onclick="openKey()" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);color:#8892a4;font-size:18px;width:36px;height:36px;border-radius:10px;cursor:pointer;margin-right:8px">⚙️</button>
   </div>
   <div class="header-sub">תרגום כתוביות מאנגלית לעברית</div>
+</div>
+
+<!-- API Key Modal -->
+<div id="apikey-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:9999;display:none;align-items:center;justify-content:center;padding:20px">
+  <div style="background:#111420;border:1px solid rgba(255,255,255,0.1);border-radius:24px;padding:32px 24px;width:100%;max-width:400px">
+    <div style="font-size:28px;text-align:center;margin-bottom:12px">🔑</div>
+    <div style="font-size:18px;font-weight:800;text-align:center;margin-bottom:8px;color:#f0f2f8">מפתח Anthropic API</div>
+    <div style="font-size:13px;color:#8892a4;text-align:center;margin-bottom:20px">נשמר במכשיר שלך בלבד<br>לא מועלה לאינטרנט</div>
+    <input type="password" id="apikey-field" placeholder="sk-ant-api03-..." style="width:100%;padding:14px;border-radius:12px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.07);color:#fff;font-size:13px;font-family:monospace;outline:none;margin-bottom:16px;direction:ltr" />
+    <button onclick="saveKey()" style="width:100%;padding:16px;border-radius:14px;border:none;background:linear-gradient(135deg,#1e6ff5,#1454c4);color:#fff;font-size:16px;font-weight:800;cursor:pointer;font-family:inherit">שמור</button>
+    <button onclick="closeKey()" style="width:100%;padding:12px;border-radius:14px;border:1px solid rgba(255,255,255,0.1);background:none;color:#8892a4;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:8px">ביטול</button>
+  </div>
 </div>
 
 <!-- Upload Panel -->
@@ -990,12 +1003,14 @@ async function translateBatch(texts) {
 
 ${numbered}`;
 
+    const CLAUDE_KEY = localStorage.getItem('subhe_apikey') || '';
+    if (!CLAUDE_KEY) throw new Error('לא הוגדר מפתח API. לחץ על ⚙️ להגדרה.');
     try {
       const res = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-api-key': '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',
+          'x-api-key': CLAUDE_KEY,
           'anthropic-version': '2023-06-01',
           'anthropic-dangerous-direct-browser-access': 'true'
         },
@@ -1543,8 +1558,30 @@ function uploadToDrive(fileId, source) {
   }
 }
 
+// ── API Key ──
+function openKey() {
+  const m = document.getElementById('apikey-modal');
+  m.style.display = 'flex';
+  const saved = localStorage.getItem('subhe_apikey') || '';
+  document.getElementById('apikey-field').value = saved;
+}
+function closeKey() {
+  document.getElementById('apikey-modal').style.display = 'none';
+}
+function saveKey() {
+  const key = document.getElementById('apikey-field').value.trim();
+  if (!key.startsWith('sk-ant-')) {
+    alert('מפתח לא תקין — חייב להתחיל ב-sk-ant-');
+    return;
+  }
+  localStorage.setItem('subhe_apikey', key);
+  closeKey();
+  alert('✅ מפתח נשמר בהצלחה!');
+}
+
 // ── Init ──
 updateTabLabels();
+if (!localStorage.getItem('subhe_apikey')) { setTimeout(openKey, 500); }
 
 
 </script>
