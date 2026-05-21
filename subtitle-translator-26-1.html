@@ -952,61 +952,71 @@ function buildSRT(blocks) {
 function fixHebrew(text) {
   return text.split('\n').map(line => {
     line = line.trim();
-    // move leading punctuation to end
-    line = line.replace(/^([.,!?;:]+)\s*/,'');
-    // trim and add period if missing (optional, keep only if needed)
+    // תיקון פיסוק עברי — נקודה/פסיק בסוף ולא בהתחלה
+    line = line.replace(/^([.،,!?;:]+)\s*/, '');
+    line = line.replace(/\s+([.,!?;:،])$/, '$1');
     return line;
   }).join('\n');
 }
 
-// ── Google Translate (דרך lingva) — מהיר מאוד ───────────────────────────
-const TRANSLATE_SERVERS = [
-  'https://lingva.ml/api/v1/en/he/',
-  'https://translate.terraprint.co/api/v1/en/he/',
-  'https://lingva.thedaviddelta.com/api/v1/en/he/'
-];
-let serverIdx = 0;
-
+// ── Claude API Translation ─────────────────────────────────────────────────
 async function translateSingle(text) {
   if (!text || !text.trim()) return text;
   const clean = text.replace(/<[^>]+>/g, '').trim();
   if (!clean) return text;
-
-  // נסה כל שרת בתור
-  for (let attempt = 0; attempt < TRANSLATE_SERVERS.length; attempt++) {
-    const server = TRANSLATE_SERVERS[(serverIdx + attempt) % TRANSLATE_SERVERS.length];
-    try {
-      const res = await fetch(server + encodeURIComponent(clean));
-      if (!res.ok) continue;
-      const data = await res.json();
-      if (data && data.translation) {
-        serverIdx = (serverIdx + attempt) % TRANSLATE_SERVERS.length;
-        return fixHebrew(data.translation);
-      }
-    } catch(e) {}
-  }
-
-  // fallback ל-MyMemory אם כל השרתים נכשלו
-  try {
-    const url = 'https://api.mymemory.translated.net/get?q='
-      + encodeURIComponent(clean) + '&langpair=en|he';
-    const res = await fetch(url);
-    const data = await res.json();
-    if (data.responseStatus === 200) return fixHebrew(data.responseData.translatedText);
-  } catch(e) {}
-
-  return text;
+  return clean; // translateBatch handles everything via Claude
 }
 
-// 20 בקשות במקביל
 async function translateBatch(texts) {
-  const CONCURRENT = 20;
-  const results = new Array(texts.length);
-  for (let i = 0; i < texts.length; i += CONCURRENT) {
-    const chunk = texts.slice(i, i + CONCURRENT);
-    const translated = await Promise.all(chunk.map(t => translateSingle(t)));
-    translated.forEach((t, j) => results[i + j] = t);
+  // סינון טקסטים ריקים
+  const nonEmpty = texts.map((t, i) => ({ t, i })).filter(x => x.t && x.t.trim());
+  if (!nonEmpty.length) return texts;
+
+  // שלח ב-chunks של 50 משפטים
+  const CHUNK = 50;
+  const results = [...texts];
+
+  for (let c = 0; c < nonEmpty.length; c += CHUNK) {
+    const chunk = nonEmpty.slice(c, c + CHUNK);
+    const numbered = chunk.map((x, n) => `${n+1}. ${x.t}`).join('\n');
+
+    const prompt = `תרגם את רשימת המשפטים הבאה מאנגלית לעברית.
+חוקים קפדניים:
+- החזר אך ורק את התרגומים ממוספרים, כל אחד בשורה נפרדת
+- פסיקים ונקודות יופיעו בסוף המשפט (לא בהתחלה)
+- כיוון טקסט: מימין לשמאל
+- אל תוסיף הסברים, רק את התרגומים
+- שמור על אותו מספור
+
+${numbered}`;
+
+    try {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 1000,
+          messages: [{ role: 'user', content: prompt }]
+        })
+      });
+      const data = await res.json();
+      const raw = data.content?.[0]?.text || '';
+      const lines = raw.split('\n').filter(l => /^\d+\./.test(l.trim()));
+      lines.forEach(line => {
+        const m = line.match(/^(\d+)\.\s*(.+)$/);
+        if (m) {
+          const idx = parseInt(m[1]) - 1;
+          if (idx >= 0 && idx < chunk.length) {
+            results[chunk[idx].i] = fixHebrew(m[2].trim());
+          }
+        }
+      });
+    } catch(e) {
+      // אם נכשל — השאר מקורי
+    }
   }
+
   return results;
 }
 
