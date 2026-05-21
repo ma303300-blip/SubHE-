@@ -1109,6 +1109,7 @@ function renderList(source) {
         <div class="file-chevron">›</div>
       </div>
       <div class="action-menu ${isOpen?'open':''}">
+        <button class="action-btn download" onclick="downloadFile('${f.id}','${source}')"><span class="btn-icon">⬇️</span>הורד קובץ</button>
         <button class="action-btn download" onclick="shareFile('${f.id}','${source}')"><span class="btn-icon">📤</span>שתף קובץ</button>
         <button class="action-btn gdrive" onclick="uploadToDrive('${f.id}','${source}')"><span class="btn-icon">☁️</span>שמור ב-Drive</button>
         <button class="action-btn danger" onclick="deleteFile('${f.id}','${source}')"><span class="btn-icon">🗑️</span>מחק קובץ</button>
@@ -1167,6 +1168,21 @@ function shareFile(id, source) {
   `;
   modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
   document.body.appendChild(modal);
+}
+
+function downloadFile(id, source) {
+  const f = getFile(id, source);
+  if (!f) return;
+  const blob = new Blob([f.content], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = f.name.endsWith('.srt') ? f.name : f.name.replace(/\.[^.]+$/, '') + '.srt';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('מוריד: ' + a.download);
 }
 
 function deleteFile(id, source) {
