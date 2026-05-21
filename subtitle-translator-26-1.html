@@ -768,7 +768,22 @@ html { background: #0a0a1a; }
 
 <!-- Upload Panel -->
 <div class="panel active" id="panel-upload">
+  <div id="step-apikey" style="display:none">
+    <div class="confirm-box">
+      <div class="confirm-file-icon">🔑</div>
+      <div class="confirm-name">הכנס את מפתח ה-API</div>
+      <div class="confirm-q" style="margin-bottom:16px">מפתח Anthropic שלך (מתחיל ב-sk-ant-)<br><small style="color:var(--text3);font-size:12px">נשמר במכשיר שלך בלבד</small></div>
+      <input type="password" id="apikey-input" placeholder="sk-ant-api03-..." style="width:100%;padding:14px;border-radius:12px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.07);color:#fff;font-size:13px;font-family:monospace;margin-bottom:16px;outline:none;" />
+      <div class="confirm-btns">
+        <button class="btn-confirm" onclick="saveApiKey()">✔ שמור והמשך</button>
+      </div>
+    </div>
+  </div>
+
   <div id="step-pick" class="upload-wrap">
+    <div style="text-align:center;margin-bottom:10px">
+      <button onclick="showStep('apikey')" style="background:none;border:1px solid rgba(255,255,255,0.1);color:var(--text3);font-size:12px;padding:6px 14px;border-radius:20px;cursor:pointer;font-family:inherit">⚙️ שנה מפתח API</button>
+    </div>
     <label class="upload-label" for="fileInput">
       <div class="upload-circle">📂</div>
       <div class="upload-title">בחר קובץ לתרגום</div>
@@ -932,9 +947,20 @@ function cancelUpload() {
 }
 
 function showStep(s) {
-  ['pick','confirm','progress','success'].forEach(x =>
+  ['apikey','pick','confirm','progress','success'].forEach(x =>
     document.getElementById('step-'+x).style.display = x===s?'block':'none'
   );
+}
+
+function saveApiKey() {
+  const key = document.getElementById('apikey-input').value.trim();
+  if (!key.startsWith('sk-ant-')) { alert('מפתח לא תקין — חייב להתחיל ב-sk-ant-'); return; }
+  localStorage.setItem('claude_api_key', key);
+  showStep('pick');
+}
+
+function getApiKey() {
+  return localStorage.getItem('claude_api_key') || '';
 }
 
 // ── SRT Parser ────────────────────────────────────────────────────────────
@@ -991,7 +1017,7 @@ async function translateBatch(texts) {
 ${numbered}`;
 
     try {
-      const CLAUDE_KEY = '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';
+      const CLAUDE_KEY = getApiKey();
       const res = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
@@ -1547,6 +1573,7 @@ function uploadToDrive(fileId, source) {
 
 // ── Init ──
 updateTabLabels();
+if (!getApiKey()) { showStep('apikey'); } else { showStep('pick'); }
 
 
 </script>
