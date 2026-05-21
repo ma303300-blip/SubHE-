@@ -1012,37 +1012,56 @@ function buildSRT(blocks) {
 }
 
 function fixHebrew(text) {
+  const RTL_MARK = '\u200F';
   return text.split('\n').map(line => {
     line = line.trim();
 
-    // הסר תווים זרים (לא עברית, לא מספרים, לא פיסוק בסיסי)
-    line = line.replace(/[^\u0590-\u05FF\u200f\u200e0-9\s.,!?;:()\'\"-–—…♪♫\[\]]/g, '');
+    // שמור תגיות HTML כמו <i> </i> — חלץ אותן לפני הניקוי
+    const tags = [];
+    line = line.replace(/<[^>]+>/g, m => { tags.push(m); return '\x00TAG' + (tags.length-1) + '\x00'; });
 
-    // הסר פיסוק שנמצא בטעות בתחילת השורה
-    line = line.replace(/^[\s.،,!?;:]+/, '');
+    // ── סינון תווים זרים — כל שפה שאינה עברית/מספרים/פיסוק ──────────────
+    // מחק: קירילי, ערבי, לטיני, סיני, יפני, קוריאני, כל Unicode זר
+    // שמור: עברית U+0590-05FF, מספרים, פיסוק, רווח, RLM/LRM, ♪♫
+    line = line.replace(/[\u0000-\u0008\u000B-\u001F]/g, ''); // תווי בקרה
+    line = line.replace(/[\u0400-\u04FF]/g, '');  // קירילי (רוסית וכו')
+    line = line.replace(/[\u0600-\u06FF]/g, '');  // ערבית
+    line = line.replace(/[\u4E00-\u9FFF]/g, '');  // סינית
+    line = line.replace(/[\u3040-\u30FF]/g, '');  // יפנית
+    line = line.replace(/[\uAC00-\uD7AF]/g, '');  // קוריאנית
 
+    // לטינית: הסר רק אם אינה חלק משם עצם מוכר (RDA, toruk וכו')
+    // כלל פשוט: 3+ אותיות לטיניות רצופות = מחק את המילה כולה
+    line = line.replace(/\b[a-zA-Z]{3,}\b/g, '');
+    // 1-2 אותיות לטיניות: הסר אלא אם מספר (A1, B2 וכו')
+    line = line.replace(/(?<![\w\d])[a-zA-Z]{1,2}(?![\d\w])/g, '');
+
+    // הסר תווים שנשארו אחרי הסינון — כל מה שאינו ברשימה הלבנה
+    line = line.replace(/[^\u0590-\u05FF\u200F\u200E\u2013\u2014\u2026\u266A\u266B0-9\s.,!?;:()\'\"-–—…♪♫\[\]\x00]/g, '');
+
+    // ── ניקוי פיסוק ────────────────────────────────────────────────────────
+    // הסר פיסוק מיותר בתחילת שורה
+    line = line.replace(/^[\s.,!?;:\u200F]+/, '');
     // הסר רווחים לפני פיסוק בסוף
-    line = line.replace(/\s+([.,!?;:،])$/, '$1');
+    line = line.replace(/\s+([.,!?;:])$/, '$1');
+    // הסר ריבוי רווחים
+    line = line.replace(/\s{2,}/g, ' ');
 
-    // ── תיקון כיוון פיסוק בעברית ──────────────────────────────────────────
-    // בעברית (RTL), סימן שאלה/קריאה צריך להיות בצד שמאל (=סוף הקריאה).
-    // נגני כתוביות רבים מציגים אותם הפוך — הפתרון: להוסיף RLM (U+200F)
-    // לפני כל סימן פיסוק סוגר, כך שה-Unicode Bidi algorithm יציב אותו נכון.
-    const RTL_MARK = '\u200F';
+    // ── תיקון כיוון פיסוק עברית (RTL Bidi) ────────────────────────────────
+    // הסר כל RLM/LRM קיים כדי לא לכפול
+    line = line.replace(/[\u200F\u200E]/g, '');
+    // הוסף RLM בתחילת השורה — מגדיר את כל השורה כ-RTL
+    // כך ? ! ונקודה בסוף יופיעו אוטומטית בצד שמאל (נכון)
+    // עובד ב: VLC, Plex, Google Drive, כל נגן תקני
+    if (line.trim().length > 0) {
+      line = RTL_MARK + line;
+    }
 
-    // הסר RLM קיים כדי לא לכפול
-    line = line.replace(/\u200F/g, '');
-
-    // הוסף RLM לפני סימני פיסוק בסוף משפט: ? ! . , ; : — …
-    // זה גורם לנגן להציג אותם בצד שמאל (סוף המשפט ב-RTL)
-    line = line.replace(/([?!.,;:—…]+)$/, RTL_MARK + '$1');
-
-    // אם המשפט מתחיל ב-♪ — שמור כמו שהוא (כיוון לא רלוונטי)
-    // אם יש סוגריים — הוסף RLM לפני הסגירה
-    line = line.replace(/(\))$/, RTL_MARK + '$1');
+    // ── החזר תגיות HTML ────────────────────────────────────────────────────
+    line = line.replace(/\x00TAG(\d+)\x00/g, (_, i) => tags[parseInt(i)] || '');
 
     return line.trim();
-  }).join('\n');
+  }).filter(l => l.length > 0).join('\n');
 }
 
 // ── Claude API Translation ─────────────────────────────────────────────────
@@ -1071,9 +1090,14 @@ async function translateBatch(texts) {
   const nonEmpty = texts.map((t, i) => ({ t, i })).filter(x => x.t && x.t.trim() && !isSoundEffect(x.t));
   if (!nonEmpty.length) return texts;
 
-  // שלח ב-chunks של 50 משפטים
-  const CHUNK = 100;
+  // CHUNK = 60 כדי שmax_tokens=2000 יספיק בוודאות לכל chunk
+  const CHUNK = 60;
   const results = [...texts];
+  // מעקב: אילו אינדקסים כבר תורגמו
+  const translated = new Set();
+
+  const API_KEY = localStorage.getItem('subhe_apikey') || '';
+  if (!API_KEY) throw new Error('לא הוגדר מפתח API. לחץ על ⚙️ להגדרה.');
 
   for (let c = 0; c < nonEmpty.length; c += CHUNK) {
     const chunk = nonEmpty.slice(c, c + CHUNK);
@@ -1082,20 +1106,21 @@ async function translateBatch(texts) {
     const prompt = `תרגם את רשימת המשפטים הבאה מאנגלית לעברית.
 חוקים קפדניים:
 - החזר אך ורק את התרגומים ממוספרים, כל אחד בשורה נפרדת
+- חייב להיות בדיוק ${chunk.length} שורות בתשובה — אחת לכל משפט
 - השתמש אך ורק באותיות עבריות, מספרים וסימני פיסוק — ללא תווים מכל שפה אחרת
-- כיוון טקסט: מימין לשמאל — סימני שאלה (?) וקריאה (!) ונקודה (.) יופיעו בסוף המשפט (צד שמאל)
-- פסיקים ונקודות יופיעו בסוף המשפט בלבד, לא בתחילתו
+- שמות עצם באנגלית (RDA, toruk וכו') — תעתק לעברית או השאר כמו שהם
+- כיוון טקסט: מימין לשמאל — סימני שאלה (?) וקריאה (!) יופיעו בסוף המשפט
 - אל תוסיף הסברים, רק את התרגומים
 - שמור על אותו מספור
 
 ${numbered}`;
 
-    const API_KEY = localStorage.getItem('subhe_apikey') || '';
-    const PROVIDER = localStorage.getItem('subhe_provider') || 'claude';
-    if (!API_KEY) throw new Error('לא הוגדר מפתח API. לחץ על ⚙️ להגדרה.');
-    for (let attempt = 0; attempt < 3; attempt++) {
+    // נסה עד 4 פעמים; בניסיון אחרון — שלח את החסרים בנפרד
+    let lastRaw = '';
+    for (let attempt = 0; attempt < 4; attempt++) {
       try {
-        let raw = '';
+        // בניסיון 3 (אחרון לפני fallback) — הגדל max_tokens
+        const maxTok = attempt >= 2 ? 4000 : 2000;
         const res = await fetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',
           headers: {
@@ -1104,25 +1129,73 @@ ${numbered}`;
             'anthropic-version': '2023-06-01',
             'anthropic-dangerous-direct-browser-access': 'true'
           },
-          body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 2000, messages: [{ role: 'user', content: prompt }] })
+          body: JSON.stringify({
+            model: 'claude-haiku-4-5-20251001',
+            max_tokens: maxTok,
+            messages: [{ role: 'user', content: prompt }]
+          })
         });
         const data = await res.json();
         if (data.error) throw new Error(data.error.message);
-        raw = data.content?.[0]?.text || '';
-        const lines = raw.split('\n').filter(l => /^\d+\./.test(l.trim()));
+        lastRaw = data.content?.[0]?.text || '';
+
+        // פרסור — קבל את כל השורות הממוספרות
+        const lines = lastRaw.split('\n').filter(l => /^\d+\./.test(l.trim()));
         lines.forEach(line => {
-          const m = line.match(/^(\d+)\.\s*(.+)$/);
+          const m = line.match(/^(\d+)\.\s*(.+)$/s);
           if (m) {
             const idx = parseInt(m[1]) - 1;
             if (idx >= 0 && idx < chunk.length) {
               results[chunk[idx].i] = fixHebrew(m[2].trim());
+              translated.add(chunk[idx].i);
             }
           }
         });
-        break; // הצליח — צא מהלולאה
+
+        // בדוק אם כל הכתוביות בchunk תורגמו
+        const missing = chunk.filter(x => !translated.has(x.i));
+        if (missing.length === 0) break; // הכל הצליח
+
+        if (attempt < 3) {
+          // יש חסרים — נסה שוב רק עם החסרים
+          await new Promise(r => setTimeout(r, 800 * (attempt + 1)));
+          continue;
+        }
+
+        // ניסיון 4 נכשל — fallback: שלח כל כתובית חסרה לבד
+        for (const x of missing) {
+          try {
+            const singleRes = await fetch('https://api.anthropic.com/v1/messages', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': API_KEY,
+                'anthropic-version': '2023-06-01',
+                'anthropic-dangerous-direct-browser-access': 'true'
+              },
+              body: JSON.stringify({
+                model: 'claude-haiku-4-5-20251001',
+                max_tokens: 500,
+                messages: [{ role: 'user', content: `תרגם משפט אחד מאנגלית לעברית, החזר רק את התרגום:\n${x.t}` }]
+              })
+            });
+            const singleData = await singleRes.json();
+            if (!singleData.error) {
+              const t = singleData.content?.[0]?.text?.trim() || x.t;
+              results[x.i] = fixHebrew(t);
+              translated.add(x.i);
+            }
+          } catch(e2) { /* שמור את המקור אם הכל נכשל */ }
+        }
+        break;
+
       } catch(e) {
-        if (attempt === 2) throw new Error('שגיאת API: ' + e.message);
-        await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+        if (attempt === 3) {
+          // שגיאת רשת — שמור את המקור כ-fallback
+          chunk.forEach(x => { if (!translated.has(x.i)) results[x.i] = x.t; });
+        } else {
+          await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+        }
       }
     }
   }
@@ -1137,8 +1210,10 @@ async function startTranslation() {
   markTranslationStart(pendingFile ? pendingFile.name : 'unknown');
   await requestWakeLock();
   const blocks = parseSRT(pendingContent);
-  const BATCH = 150; // כל קריאה = 150 כתוביות
-  const PARALLEL = 3; // 3 קריאות במקביל
+  // BATCH=120 מותאם ל-CHUNK=60 בתוך translateBatch (2 chunks לקריאה)
+  // PARALLEL=2 — מאזן בין מהירות לאמינות
+  const BATCH = 120;
+  const PARALLEL = 2;
   const translated = new Array(blocks.length);
 
   try {
@@ -1150,15 +1225,20 @@ async function startTranslation() {
     let done = 0;
     for (let i=0; i<batches.length; i+=PARALLEL) {
       const group = batches.slice(i, i+PARALLEL);
+      const from = i * BATCH + 1;
+      const to = Math.min((i + PARALLEL) * BATCH, blocks.length);
       document.getElementById('progress-text').textContent =
-        `מתרגם ${Math.min(i*BATCH+1, blocks.length)}–${Math.min((i+PARALLEL)*BATCH, blocks.length)} מתוך ${blocks.length}...`;
+        `מתרגם ${from}–${to} מתוך ${blocks.length} כתוביות...`;
 
       if (translationCancelled) break;
       await Promise.all(group.map(async ({ start, chunk }) => {
         if (translationCancelled) return;
         const results = await translateBatch(chunk.map(b=>b.text));
         if (translationCancelled) return;
-        results.forEach((t,j) => { translated[start+j] = {...chunk[j], text:fixHebrew(t)}; });
+        results.forEach((t,j) => {
+          // fixHebrew כבר רץ בתוך translateBatch — לא לכפול
+          translated[start+j] = {...chunk[j], text: t || chunk[j].text};
+        });
         done += chunk.length;
         const pct = Math.round((done/blocks.length)*100);
         document.getElementById('progress-fill').style.width = pct+'%';
