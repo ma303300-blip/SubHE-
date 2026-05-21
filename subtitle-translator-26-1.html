@@ -991,10 +991,12 @@ function buildSRT(blocks) {
 function fixHebrew(text) {
   return text.split('\n').map(line => {
     line = line.trim();
+    // הסר תווים זרים (לא עברית, לא מספרים, לא פיסוק בסיסי)
+    line = line.replace(/[^\u0590-\u05FF\u200f\u200e0-9\s.,!?;:()\'\"-–—…♪♫\[\]]/g, '');
     // תיקון פיסוק עברי — נקודה/פסיק בסוף ולא בהתחלה
     line = line.replace(/^([.،,!?;:]+)\s*/, '');
     line = line.replace(/\s+([.,!?;:،])$/, '$1');
-    return line;
+    return line.trim();
   }).join('\n');
 }
 
@@ -1046,33 +1048,37 @@ ${numbered}`;
     const API_KEY = localStorage.getItem('subhe_apikey') || '';
     const PROVIDER = localStorage.getItem('subhe_provider') || 'claude';
     if (!API_KEY) throw new Error('לא הוגדר מפתח API. לחץ על ⚙️ להגדרה.');
-    try {
-      let raw = '';
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': API_KEY,
-          'anthropic-version': '2023-06-01',
-          'anthropic-dangerous-direct-browser-access': 'true'
-        },
-        body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 2000, messages: [{ role: 'user', content: prompt }] })
-      });
-      const data = await res.json();
-      if (data.error) throw new Error(data.error.message);
-      raw = data.content?.[0]?.text || '';
-      const lines = raw.split('\n').filter(l => /^\d+\./.test(l.trim()));
-      lines.forEach(line => {
-        const m = line.match(/^(\d+)\.\s*(.+)$/);
-        if (m) {
-          const idx = parseInt(m[1]) - 1;
-          if (idx >= 0 && idx < chunk.length) {
-            results[chunk[idx].i] = fixHebrew(m[2].trim());
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        let raw = '';
+        const res = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': API_KEY,
+            'anthropic-version': '2023-06-01',
+            'anthropic-dangerous-direct-browser-access': 'true'
+          },
+          body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 2000, messages: [{ role: 'user', content: prompt }] })
+        });
+        const data = await res.json();
+        if (data.error) throw new Error(data.error.message);
+        raw = data.content?.[0]?.text || '';
+        const lines = raw.split('\n').filter(l => /^\d+\./.test(l.trim()));
+        lines.forEach(line => {
+          const m = line.match(/^(\d+)\.\s*(.+)$/);
+          if (m) {
+            const idx = parseInt(m[1]) - 1;
+            if (idx >= 0 && idx < chunk.length) {
+              results[chunk[idx].i] = fixHebrew(m[2].trim());
+            }
           }
-        }
-      });
-    } catch(e) {
-      // אם נכשל — השאר מקורי
+        });
+        break; // הצליח — צא מהלולאה
+      } catch(e) {
+        if (attempt === 2) throw new Error('שגיאת API: ' + e.message);
+        await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+      }
     }
   }
 
