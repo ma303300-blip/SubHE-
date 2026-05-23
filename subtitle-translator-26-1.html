@@ -1387,33 +1387,22 @@ function shareFile(id, source) {
 }
 
 // פותח בורר קבצים → שולח לוואטסאפ
+// WhatsApp — פותח וואטסאפ, המשתמש בוחר קובץ מהמסמכים ושולח
 function pickAndShareWhatsApp() {
   document.getElementById('shareModal')?.remove();
-  // פתח וואטסאפ — המשתמש בוחר איש קשר ושולח קובץ מהמסמכים שלו
-  window.location.href = 'whatsapp://';
+  window.open('https://wa.me/', '_blank');
 }
 
-// שיתוף כללי / טלגרם
-async function pickAndShare(target) {
+// טלגרם / שיתוף כללי
+function pickAndShare(target) {
   document.getElementById('shareModal')?.remove();
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = '.srt';
-  input.onchange = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const txtFile = new File([file], file.name.replace(/\.srt$/i, '.srt.txt'), { type: 'text/plain' });
-    if (navigator.share) {
-      try {
-        await navigator.share({ files: [txtFile], title: txtFile.name, text: '🎬 כתוביות מתורגמות לעברית' });
-      } catch(err) {
-        if (err.name !== 'AbortError') showToast('שגיאה בשיתוף');
-      }
-    } else {
-      showToast('השיתוף אינו נתמך בדפדפן זה — נסה מהורדות');
-    }
-  };
-  input.click();
+  if (target === 'telegram') {
+    window.open('https://t.me/', '_blank');
+  } else if (navigator.share) {
+    navigator.share({ title: 'כתוביות מתורגמות', text: '🎬 כתוביות מתורגמות לעברית' }).catch(() => {});
+  } else {
+    showToast('פתח את הקובץ מהורדות ושתף משם');
+  }
 }
 
 function downloadFile(id, source) {
