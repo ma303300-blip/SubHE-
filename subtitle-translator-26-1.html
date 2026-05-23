@@ -1398,14 +1398,13 @@ async function pickAndShareWhatsApp() {
       const file = e.target.files[0];
       if (!file) return;
       // Web Share API — שולח קובץ ישירות לוואטסאפ
-      if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+      if (navigator.share) {
         try {
           await navigator.share({ files: [file], title: file.name, text: '🎬 כתוביות מתורגמות לעברית' });
         } catch(err) {
           if (err.name !== 'AbortError') showToast('שגיאה בשיתוף — נסה שוב');
         }
       } else {
-        // fallback — פתח וואטסאפ עם טקסט
         window.open('https://wa.me/?text=' + encodeURIComponent('🎬 ' + file.name + ' — כתוביות מתורגמות לעברית'), '_blank');
         showToast('בוואטסאפ: לחץ על סמן הקובץ 📎 ושלח');
       }
@@ -1425,7 +1424,7 @@ async function pickAndShare(target) {
   input.onchange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+    if (navigator.share) {
       try {
         await navigator.share({ files: [file], title: file.name, text: '🎬 כתוביות מתורגמות לעברית' });
       } catch(err) {
