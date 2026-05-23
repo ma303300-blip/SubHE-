@@ -1314,7 +1314,7 @@ function renderList(source) {
       </div>
       <div class="action-menu ${isOpen?'open':''}">
         <button class="action-btn download" onclick="downloadFile('${f.id}','${source}')"><span class="btn-icon">⬇️</span>הורד קובץ</button>
-        <button class="action-btn download" onclick="shareFile('${f.id}','${source}')"><span class="btn-icon">📤</span>שתף קובץ</button>
+        
         <button class="action-btn gdrive" onclick="uploadToDrive('${f.id}','${source}')"><span class="btn-icon">☁️</span>שמור ב-Drive</button>
         <button class="action-btn danger" onclick="deleteFile('${f.id}','${source}')"><span class="btn-icon">🗑️</span>מחק קובץ</button>
         ${favBtn}
