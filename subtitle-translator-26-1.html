@@ -1910,5 +1910,92 @@ self.addEventListener('fetch', e => {
   <button onclick="dismissInstallBanner()" style="background:none;border:none;color:rgba(255,255,255,0.6);font-size:18px;cursor:pointer;padding:4px;flex-shrink:0">✕</button>
 </div>
 
+<!-- ── באנר משפטי תחתון ── -->
+<div style="text-align:center;padding:8px 16px calc(8px + env(safe-area-inset-bottom,0px));background:rgba(0,0,0,0.4);font-size:11px;color:rgba(255,255,255,0.35);direction:rtl;">
+  <span onclick="openLegal('privacy')" style="cursor:pointer;text-decoration:underline;margin-left:12px;">מדיניות פרטיות</span>
+  <span onclick="openLegal('terms')" style="cursor:pointer;text-decoration:underline;">תנאי שימוש</span>
+</div>
+
+<!-- ── מודל משפטי ── -->
+<div id="legalModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;overflow-y:auto;direction:rtl;">
+  <div style="max-width:480px;margin:0 auto;background:#0e1118;min-height:100vh;padding:32px 20px calc(40px + env(safe-area-inset-bottom,0px));">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;">
+      <h2 id="legalTitle" style="font-size:20px;font-weight:900;color:#f0f2f8;margin:0;"></h2>
+      <button onclick="closeLegal()" style="background:rgba(255,255,255,0.1);border:none;color:#fff;font-size:20px;width:36px;height:36px;border-radius:50%;cursor:pointer;">✕</button>
+    </div>
+    <div id="legalContent" style="font-size:14px;color:#8892a4;line-height:1.8;"></div>
+  </div>
+</div>
+
+<script>
+const legalTexts = {
+  privacy: {
+    title: 'מדיניות פרטיות',
+    content: `
+      <p style="color:#f0f2f8;font-weight:700;margin-bottom:16px;">עדכון אחרון: מאי 2026</p>
+
+      <h3 style="color:#f0f2f8;margin:20px 0 8px;">1. מידע שנאסף</h3>
+      <p>האפליקציה SubHE אינה אוספת, שומרת או מעבירה כל מידע אישי על המשתמשים. מפתח ה-API שמוזן על ידי המשתמש נשמר באופן מקומי על המכשיר בלבד ואינו נשלח לשרתי המפתח.</p>
+
+      <h3 style="color:#f0f2f8;margin:20px 0 8px;">2. שימוש בשירותי צד שלישי</h3>
+      <p>האפליקציה משתמשת ב-API של Anthropic לצורך תרגום. קבצי הכתוביות שמועלים לתרגום נשלחים לשרתי Anthropic בהתאם למדיניות הפרטיות שלהם. המשתמש אחראי לעיין במדיניות הפרטיות של Anthropic בכתובת anthropic.com.</p>
+
+      <h3 style="color:#f0f2f8;margin:20px 0 8px;">3. אחריות המשתמש</h3>
+      <p>המשתמש נושא באחריות המלאה והבלעדית לכל תוכן שמועלה לתרגום. אין להעלות תוכן המוגן בזכויות יוצרים ללא הרשאה מתאימה.</p>
+
+      <h3 style="color:#f0f2f8;margin:20px 0 8px;">4. אבטחת מידע</h3>
+      <p>כל הנתונים מעובדים ישירות על מכשיר המשתמש. המפתח אינו אחראי לכל אובדן מידע או פרצת אבטחה הנובעת משימוש באפליקציה.</p>
+
+      <h3 style="color:#f0f2f8;margin:20px 0 8px;">5. צור קשר</h3>
+      <p>לשאלות בנוגע למדיניות הפרטיות ניתן לפנות למפתח האפליקציה.</p>
+    `
+  },
+  terms: {
+    title: 'תנאי שימוש',
+    content: `
+      <p style="color:#f0f2f8;font-weight:700;margin-bottom:16px;">עדכון אחרון: מאי 2026</p>
+
+      <h3 style="color:#f0f2f8;margin:20px 0 8px;">1. קבלת התנאים</h3>
+      <p>השימוש באפליקציה SubHE מהווה הסכמה מלאה לתנאי שימוש אלו. אם אינך מסכים לתנאים, עליך להפסיק את השימוש באפליקציה לאלתר.</p>
+
+      <h3 style="color:#f0f2f8;margin:20px 0 8px;">2. הגבלת אחריות המפתח</h3>
+      <p><strong style="color:#e05555;">האחריות המלאה והבלעדית לכל שימוש באפליקציה מוטלת על המשתמש בלבד.</strong> המפתח של SubHE אינו נושא בכל אחריות, ישירה או עקיפה, לכל נזק, הפסד, תביעה משפטית, או כל תוצאה אחרת הנובעת מהשימוש באפליקציה, לרבות:</p>
+      <ul style="margin:8px 0;padding-right:20px;">
+        <li>שגיאות בתרגום</li>
+        <li>אובדן קבצים או נתונים</li>
+        <li>הפרת זכויות יוצרים על ידי המשתמש</li>
+        <li>עלויות API שנצברו</li>
+        <li>כל נזק ישיר או עקיף אחר</li>
+      </ul>
+
+      <h3 style="color:#f0f2f8;margin:20px 0 8px;">3. שימוש מותר</h3>
+      <p>האפליקציה מיועדת לשימוש אישי ולגיטימי בלבד. המשתמש מתחייב שלא להשתמש באפליקציה לתרגום תוכן הפוגע בזכויות יוצרים, תוכן בלתי חוקי, או כל מטרה אחרת הנוגדת את החוק.</p>
+
+      <h3 style="color:#f0f2f8;margin:20px 0 8px;">4. זכויות קניין רוחני</h3>
+      <p>כל זכויות הקניין הרוחני של האפליקציה שייכות למפתח. אין להעתיק, לשכפל, לשנות או להפיץ את האפליקציה ללא אישור מפורש בכתב.</p>
+
+      <h3 style="color:#f0f2f8;margin:20px 0 8px;">5. שינויים בתנאים</h3>
+      <p>המפתח שומר לעצמו את הזכות לשנות תנאים אלו בכל עת. המשך השימוש באפליקציה לאחר שינוי התנאים מהווה הסכמה לתנאים החדשים.</p>
+
+      <h3 style="color:#f0f2f8;margin:20px 0 8px;">6. דין חל</h3>
+      <p>תנאי שימוש אלו כפופים לדין הישראלי. כל סכסוך יידון בבתי המשפט המוסמכים בישראל.</p>
+    `
+  }
+};
+
+function openLegal(type) {
+  const data = legalTexts[type];
+  document.getElementById('legalTitle').textContent = data.title;
+  document.getElementById('legalContent').innerHTML = data.content;
+  document.getElementById('legalModal').style.display = 'block';
+  document.body.style.overflow = 'hidden';
+}
+
+function closeLegal() {
+  document.getElementById('legalModal').style.display = 'none';
+  document.body.style.overflow = '';
+}
+</script>
+
 </body>
 </html>
