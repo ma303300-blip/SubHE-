@@ -973,7 +973,7 @@ function updateTabLabels() {
 
 // ── App Version ───────────────────────────────────────────────────────────
 // עדכן את המספר הזה בכל שינוי — כדי לדעת בוודאות שהגרסה החדשה נטענה
-const APP_VERSION = 'v1.7';
+const APP_VERSION = 'v1.8';
 document.addEventListener('DOMContentLoaded', () => {
   const el = document.getElementById('app-version');
   if (el) el.textContent = APP_VERSION;
@@ -1508,22 +1508,8 @@ function closeBanner() {
 }
 
 // Service Worker for offline support
-if ('serviceWorker' in navigator) {
-  const swCode = `
-    const CACHE = 'subhe-v2';
-    self.addEventListener('install', e => {
-      e.waitUntil(caches.open(CACHE).then(c => c.addAll(['./', './index.html'])));
-    });
-    self.addEventListener('fetch', e => {
-      e.respondWith(
-        fetch(e.request).catch(() => caches.match(e.request))
-      );
-    });
-  `;
-  const blob = new Blob([swCode], {type: 'application/javascript'});
-  const swUrl = URL.createObjectURL(blob);
-  navigator.serviceWorker.register(swUrl).catch(() => {});
-}
+// (רישום ה-Service Worker מתבצע בהמשך הקובץ מקובץ sw.js אמיתי)
+
 
 
 // ── Updated render functions ──────────────────────────────────────────────
@@ -1947,30 +1933,11 @@ window.addEventListener('appinstalled', () => {
 
 // ── Service Worker Registration (למהירות טעינה חוזרת) ───────────────────
 if ('serviceWorker' in navigator) {
-  const swCode = `
-const CACHE = 'subhe-v2';
-const ASSETS = [location.href];
-self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).catch(()=>{}));
-  self.skipWaiting();
-});
-self.addEventListener('activate', e => {
-  e.waitUntil(caches.keys().then(keys => Promise.all(
-    keys.filter(k => k !== CACHE).map(k => caches.delete(k))
-  )));
-  self.clients.claim();
-});
-self.addEventListener('fetch', e => {
-  if (e.request.url.includes('api.anthropic.com') ||
-      e.request.url.includes('googleapis.com') ||
-      e.request.url.includes('fonts.googleapis.com')) return;
-  e.respondWith(
-    caches.match(e.request).then(r => r || fetch(e.request).catch(() => r))
-  );
-});`;
-  const blob = new Blob([swCode], { type: 'application/javascript' });
-  const swUrl = URL.createObjectURL(blob);
-  navigator.serviceWorker.register(swUrl, { scope: './' }).catch(() => {});
+  // רישום Service Worker מקובץ אמיתי (sw.js) — נדרש כדי שאנדרואיד
+  // יזהה את זה כ-PWA מלא ויתקין אייקון אמיתי (לא קיצור דרך של כרום)
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js', { scope: './' }).catch(() => {});
+  });
 }
 
 </script>
