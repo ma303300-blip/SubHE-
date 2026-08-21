@@ -1018,7 +1018,8 @@ function parseSRT(txt) {
 }
 
 function buildSRT(blocks) {
-  return blocks.map(b=>`${b.index}\n${b.timecode}\n${b.text}`).join('\n\n')+'\n';
+  // סנן בלוקים חסרים/פגומים (חורים במערך) כדי שלעולם לא ייווצרו שורות ריקות בפלט
+  return blocks.filter(b => b && b.timecode).map(b=>`${b.index}\n${b.timecode}\n${b.text}`).join('\n\n')+'\n';
 }
 
 function fixHebrew(text) {
@@ -1293,6 +1294,12 @@ async function startTranslation() {
     document.getElementById('progress-text').textContent = 'מסיים...';
     document.getElementById('progress-fill').style.width='100%';
     document.getElementById('progress-pct').textContent='100%';
+
+    // ביטחון: כל בלוק שלא הושם (למשל אצווה שנפלה) — שמור לפחות את הבלוק המקורי.
+    // כך לעולם לא נוצרת כתובית ריקה; במקרה הגרוע נשאר הטקסט המקורי.
+    for (let k = 0; k < blocks.length; k++) {
+      if (!translated[k]) translated[k] = blocks[k];
+    }
 
     const srtContent = buildSRT(translated);
     const heName = pendingFile.name.replace(/\.srt$/i,'_he.srt');
