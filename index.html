@@ -1930,9 +1930,26 @@ window.addEventListener('appinstalled', () => {
   showToast('✅ SubHE הותקנה בהצלחה!');
 });
 
-// ── Service Worker Registration (קובץ אמיתי — נדרש להתקנת PWA באנדרואיד) ──
+// ── Service Worker Registration + עדכון אוטומטי לגרסה החדשה ──────────────
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('./sw.js', { scope: './' }).catch(() => {});
+  // האם כבר יש SW ששולט בדף? אם לא — זו הפעלה ראשונה, אין צורך ברענון.
+  const hadController = !!navigator.serviceWorker.controller;
+
+  navigator.serviceWorker.register('./sw.js', { scope: './', updateViaCache: 'none' })
+    .then(reg => {
+      // בדוק אם יש גרסה חדשה מיד, ואז כל דקה — כדי שעדכונים ייתפסו מהר
+      reg.update();
+      setInterval(() => reg.update(), 60 * 1000);
+    })
+    .catch(() => {});
+
+  // כשגרסת SW חדשה משתלטת על הדף — רענן פעם אחת אוטומטית לגרסה החדשה
+  let refreshing = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (refreshing || !hadController) return;
+    refreshing = true;
+    window.location.reload();
+  });
 }
 
 </script>
